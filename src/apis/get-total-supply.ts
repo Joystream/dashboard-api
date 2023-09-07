@@ -1,4 +1,4 @@
-import { JoyApi } from "./joyApi";
+import { JoyApi } from "../apis/joyApi";
 
 const api = new JoyApi();
 

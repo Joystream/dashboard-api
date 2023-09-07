@@ -1,5 +1,5 @@
 import axios from "axios";
-import { JoyApi } from "./joyApi";
+import { JoyApi } from "../apis/joyApi";
 
 const NUMBER_OF_ITMES_TO_FETCH = 10;
 
@@ -119,9 +119,11 @@ const getProposalParameterKeyFromType = (string: string) => {
     ) as unknown as (typeof ProposalParameterString)[number];
 };
 
-const getStatusFromStatusType = (status: string) => status.substring(PROPOSAL_STATUS.length);
+const getStatusFromStatusType = (status: string) =>
+  status.substring(PROPOSAL_STATUS.length);
 
-const getSecondsFromBlocks = (blocks: number) => blocks * BLOCK_INTERVAL_IN_SECONDS;
+const getSecondsFromBlocks = (blocks: number) =>
+  blocks * BLOCK_INTERVAL_IN_SECONDS;
 
 const incorporateProposalExpiryDate = (proposals: Array<Proposal>) => {
   return Promise.all(
@@ -134,17 +136,22 @@ const incorporateProposalExpiryDate = (proposals: Array<Proposal>) => {
 
       const status = getStatusFromStatusType(statusType);
       const statusSetAtDate = new Date(statusSetAtTime);
-      const proposalParameterKey = getProposalParameterKeyFromType(proposalType);
+      const proposalParameterKey =
+        getProposalParameterKeyFromType(proposalType);
       const proposalParameter = (
         await api.api.consts.proposalsCodex[proposalParameterKey]
       ).toJSON() as ProposalParameter;
 
       if (status === GRACING) {
-        statusSetAtDate.setSeconds(getSecondsFromBlocks(proposalParameter.gracePeriod));
+        statusSetAtDate.setSeconds(
+          getSecondsFromBlocks(proposalParameter.gracePeriod)
+        );
       }
 
       if (status === DECIDING) {
-        statusSetAtDate.setSeconds(getSecondsFromBlocks(proposalParameter.votingPeriod));
+        statusSetAtDate.setSeconds(
+          getSecondsFromBlocks(proposalParameter.votingPeriod)
+        );
       }
 
       return {
@@ -157,7 +164,10 @@ const incorporateProposalExpiryDate = (proposals: Array<Proposal>) => {
   );
 };
 
-const findAllValidPotentialAssets = async (storageBag?: StorageBag, assetId?: string) => {
+const findAllValidPotentialAssets = async (
+  storageBag?: StorageBag,
+  assetId?: string
+) => {
   if (!storageBag || !assetId) return [];
 
   const resultArr = [];
@@ -186,11 +196,12 @@ const findAllValidPotentialAssets = async (storageBag?: StorageBag, assetId?: st
 const getCarouselData = async () => {
   await api.init;
 
-  const result: { nfts: Array<{}>; proposals: Array<{}>; payouts: Array<{}> } = {
-    nfts: [],
-    proposals: [],
-    payouts: [],
-  };
+  const result: { nfts: Array<{}>; proposals: Array<{}>; payouts: Array<{}> } =
+    {
+      nfts: [],
+      proposals: [],
+      payouts: [],
+    };
 
   const response = await api.qnQuery<{
     ownedNfts: Array<NFT>;
@@ -292,15 +303,22 @@ const getCarouselData = async () => {
       }) => ({
         nftTitle,
         channelName,
-        joyAmount: Math.round(Number(lastSalePrice) / 10_000_000_000).toString(),
+        joyAmount: Math.round(
+          Number(lastSalePrice) / 10_000_000_000
+        ).toString(),
         lastSaleDate,
-        imageUrl: await findAllValidPotentialAssets(storageBag, thumbnailPhotoId),
+        imageUrl: await findAllValidPotentialAssets(
+          storageBag,
+          thumbnailPhotoId
+        ),
         videoUrl: `https://gleev.xyz/video/${videoId}`,
       })
     )
   );
 
-  result.proposals = (await incorporateProposalExpiryDate(response.proposals)).map(
+  result.proposals = (
+    await incorporateProposalExpiryDate(response.proposals)
+  ).map(
     ({
       title,
       status: { __typename: statusType },
@@ -327,10 +345,17 @@ const getCarouselData = async () => {
   result.payouts = (
     await Promise.all(
       response.channelPaymentMadeEvents.map(
-        async ({ amount, payeeChannel: { id: channelId, avatarPhoto, title }, createdAt }) => ({
+        async ({
+          amount,
+          payeeChannel: { id: channelId, avatarPhoto, title },
+          createdAt,
+        }) => ({
           joyAmount: Math.round(Number(amount) / 10_000_000_000).toString(),
           createdAt,
-          imageUrl: await findAllValidPotentialAssets(avatarPhoto?.storageBag, avatarPhoto?.id),
+          imageUrl: await findAllValidPotentialAssets(
+            avatarPhoto?.storageBag,
+            avatarPhoto?.id
+          ),
           channelName: title,
           channelUrl: `https://gleev.xyz/channel/${channelId}`,
         })

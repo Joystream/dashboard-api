@@ -1,31 +1,42 @@
 import express from "express";
-import apicache from "apicache";
 import cors from "cors";
 import cron from "node-cron";
 import path from "path";
 import fs from "fs";
-import { getStatus } from "./routes/get-status";
-import { getBudgets } from "./routes/get-budgets";
 import { log } from "./utils/debug";
-import getCarouselData from "./routes/get-carousel-data";
-import getPrice from "./routes/get-price";
-import getCirculatingSupply from "./routes/get-circulating-supply";
-import { calculateSecondsUntilNext5MinuteInterval } from "./utils/utils";
-import getTotalSupply from "./routes/get-total-supply";
+import getCarouselData from "./apis/get-carousel-data";
+import getCirculatingSupply from "./apis/get-circulating-supply";
+import getTotalSupply from "./apis/get-total-supply";
+import { Client, ClientOptions } from "discord.js";
+
+import price from "./routes/price";
+import criculatingSupply from "./routes/criculatingSupply";
+import totalSupply from "./routes/totalSupply";
+import budgets from "./routes/budgets";
+import carouselData from "./routes/carouselData";
+
+const options: ClientOptions = {
+  intents: [
+    "GuildMembers", // Specify the GUILDS intent
+    "Guilds",
+  ],
+};
+
+const client = new Client(options);
 
 const app = express();
-const cache = apicache.middleware;
 const port = process.env.PORT || 8081;
+
 const CAROUSEL_DATA_PATH = path.join(__dirname, "../carousel-data.json");
-const CIRCULATING_SUPPLY_DATA_PATH = path.join(
-  __dirname,
-  "../circulating-supply-data.json"
-);
 const TOTAL_SUPPLY_DATA_PATH = path.join(
   __dirname,
   "../total-supply-data.json"
 );
 
+const CIRCULATING_SUPPLY_DATA_PATH = path.join(
+  __dirname,
+  "../circulating-supply-data.json"
+);
 app.use(cors());
 app.use(express.json());
 
@@ -65,64 +76,27 @@ const scheduleCronJob = async () => {
   cron.schedule("*/5 * * * *", fetchAndWriteSupplyData);
 };
 
-app.get("/", cache("1 hour"), async (req, res) => {
-  let status = await getStatus();
-  res.setHeader("Content-Type", "application/json");
-  res.send(status);
+app.use("./price", price);
+app.use("./circulatingSupply", criculatingSupply);
+app.use("./totalSupply", totalSupply);
+app.use("./budgets", budgets);
+app.use("./carouselData", carouselData);
+
+client.on("ready", () => {
+  console.log(`Logged in as ${client.user?.tag}!`);
 });
 
-app.get("/budgets", cache("1 day"), async (req, res) => {
-  let budgets = await getBudgets();
-  res.setHeader("Content-Type", "application/json");
-  res.send(budgets);
-});
-
-app.get("/carousel-data", async (req, res) => {
-  if (fs.existsSync(CAROUSEL_DATA_PATH)) {
-    const carouselData = fs.readFileSync(CAROUSEL_DATA_PATH);
-    res.setHeader("Content-Type", "application/json");
-    res.send(JSON.parse(carouselData.toString()));
-
-    return;
+client.on("message", async (msg) => {
+  if (msg.content === "!membercount") {
+    const guild = client.guilds.cache.get(
+      String(process.env.DISCORD_SERVER_ID)
+    );
+    const memberCount = guild?.members.cache.size;
+    await msg.reply(`The member count of this server is ${memberCount}.`);
   }
-
-  res.setHeader("Retry-After", calculateSecondsUntilNext5MinuteInterval());
-  res.status(503).send();
 });
 
-app.get("/price", cache("10 minutes"), async (req, res) => {
-  let price = await getPrice();
-  res.setHeader("Content-Type", "application/json");
-  res.send(price);
-});
-
-app.get("/circulating-supply", async (req, res) => {
-  if (fs.existsSync(CIRCULATING_SUPPLY_DATA_PATH)) {
-    const circulatingSupplyData = fs.readFileSync(CIRCULATING_SUPPLY_DATA_PATH);
-    res.setHeader("Content-Type", "text/plain");
-    const { circulatingSupply } = JSON.parse(circulatingSupplyData.toString());
-    res.send(`${circulatingSupply}`).end();
-
-    return;
-  }
-
-  res.setHeader("Retry-After", calculateSecondsUntilNext5MinuteInterval());
-  res.status(503).send();
-});
-
-app.get("/total-supply", async (req, res) => {
-  if (fs.existsSync(TOTAL_SUPPLY_DATA_PATH)) {
-    const totalSupplyData = fs.readFileSync(TOTAL_SUPPLY_DATA_PATH);
-    res.setHeader("Content-Type", "text/plain");
-    const { totalSupply } = JSON.parse(totalSupplyData.toString());
-    res.send(`${totalSupply}`).end();
-
-    return;
-  }
-
-  res.setHeader("Retry-After", calculateSecondsUntilNext5MinuteInterval());
-  res.status(503).send();
-});
+client.login(process.env.DISCORD_TOKEN);
 
 scheduleCronJob().then(() => {
   app.listen(port, () => {
